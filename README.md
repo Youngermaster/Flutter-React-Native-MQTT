@@ -1,4 +1,3 @@
-# Flutter RabbitMQ
+# Flutter React Native MQTT
 
-This is a simple mobile application made to test out some simple RabbitMQ 
-functionalities in Flutter.
+A project to store some client side apps to intereact with a MQTT Broker.
