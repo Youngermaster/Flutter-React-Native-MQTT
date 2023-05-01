@@ -18,7 +18,7 @@ def publish_to_topic(topic):
     while True:
         latitude = random.uniform(-90, 90)
         longitude = random.uniform(-180, 180)
-        random_id = random.randint(1, 1000)
+        random_id = random.randint(1, 3)  # Changed the range to 1-3
         message = f"ID: {random_id} | Location: {latitude:.6f}, {longitude:.6f}"
         client.publish(topic, message)
         print(f"Sent message to topic {topic}: {message}")
