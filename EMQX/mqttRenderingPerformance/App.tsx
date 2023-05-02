@@ -3,6 +3,9 @@ import React, { useState, useEffect } from 'react';
 import { View, Text } from 'react-native';
 // Import MQTT client and message from the library
 import { Client, Message } from 'react-native-paho-mqtt';
+import MapView, { Marker } from 'react-native-maps';
+import customMarkerImage from './assets/bus_marker.png';
+
 
 // Define a custom storage object for the MQTT client
 const myStorage = {
@@ -72,11 +75,29 @@ const MQTTLocationComponent = () => {
 
   // Render the location data as a list of Text components
   return (
-    <View>
-      {Object.entries(locationData).map(([id, message]) => (
-        <Text key={id}>{message}</Text>
-      ))}
-    </View>
+    <MapView
+      style={{ flex: 1 }}
+      initialRegion={{
+        latitude: 0,
+        longitude: 0,
+        latitudeDelta: 180,
+        longitudeDelta: 360,
+      }}
+    >
+      {Object.entries(locationData).map(([id, message]) => {
+        const [, lat, lon] = message.match(/Location: (.*), (.*)/);
+        return (
+          <Marker
+            key={id}
+            coordinate={{
+              latitude: parseFloat(lat),
+              longitude: parseFloat(lon),
+            }}
+            image={customMarkerImage}
+          />
+        );
+      })}
+    </MapView>
   );
 };
 
