@@ -6,6 +6,19 @@ import { Client, Message } from 'react-native-paho-mqtt';
 import MapView, { Marker } from 'react-native-maps';
 import customMarkerImage from './assets/bus_marker.png';
 
+interface LocationData {
+  [id: string]: {
+    driverLocation: {
+      latitude: number;
+      longitude: number;
+    };
+    route: any[];
+    registerId: string;
+    colorVehicle: boolean;
+    indexDriver: number;
+    iconMetro: boolean;
+  };
+}
 
 // Define a custom storage object for the MQTT client
 const myStorage = {
@@ -24,7 +37,7 @@ const myStorage = {
 // Define the MQTTLocationComponent
 const MQTTLocationComponent = () => {
   // Create a state variable to store the location data
-  const [locationData, setLocationData] = useState<Record<string, string>>({});
+  const [locationData, setLocationData] = useState<LocationData>({});
 
   // Use an effect to handle MQTT client initialization and cleanup
   useEffect(() => {
@@ -42,12 +55,14 @@ const MQTTLocationComponent = () => {
 
     // Define a callback for handling incoming messages
     const onMessageArrived = (message: Message) => {
-      // ! Uncomment here if you want to LOG, I use MQTTX so I don't need to log here.
-      // console.log('Received message:', message.payloadString);
       const payload = message.payloadString;
-      const id = payload.split(' | ')[0].split(': ')[1]; // Extract the ID from the message
-      // Update the location data state with the received message
-      setLocationData((prevData) => ({ ...prevData, [id]: payload }));
+      try {
+        const data = JSON.parse(payload);
+        const id = message.destinationName.split('/')[1]; // Extract the ID from the topic
+        setLocationData((prevData) => ({ ...prevData, [id]: data }));
+      } catch (error) {
+        console.log('Failed to parse message:', error);
+      }
     };
 
     // Register the callbacks with the MQTT client
@@ -73,7 +88,7 @@ const MQTTLocationComponent = () => {
     };
   }, []);
 
-  // Render the location data as a list of Text components
+  // Render the location data as markers on the map
   return (
     <MapView
       style={{ flex: 1 }}
@@ -84,14 +99,14 @@ const MQTTLocationComponent = () => {
         longitudeDelta: 360,
       }}
     >
-      {Object.entries(locationData).map(([id, message]) => {
-        const [, lat, lon] = message.match(/Location: (.*), (.*)/);
+      {Object.entries(locationData).map(([id, data]) => {
+        const { latitude, longitude } = data.driverLocation;
         return (
           <Marker
             key={id}
             coordinate={{
-              latitude: parseFloat(lat),
-              longitude: parseFloat(lon),
+              latitude,
+              longitude,
             }}
             image={customMarkerImage}
           />
