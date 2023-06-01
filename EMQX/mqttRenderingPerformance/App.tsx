@@ -1,5 +1,5 @@
 // Import React hooks and React Native components
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text } from 'react-native';
 // Import MQTT client and message from the library
 import { Client, Message } from 'react-native-paho-mqtt';
@@ -38,9 +38,13 @@ const myStorage = {
 const MQTTLocationComponent = () => {
   // Create a state variable to store the location data
   const [locationData, setLocationData] = useState<LocationData>({});
+  // Create a ref for the last received message flag
+  const lastReceivedMessageRef = useRef<boolean>(false);
 
   // Use an effect to handle MQTT client initialization and cleanup
   useEffect(() => {
+    let timeout: NodeJS.Timeout | null = null;
+
     // Create a new MQTT client with the given configuration
     const client = new Client({
       uri: 'ws://10.0.2.2:8083/mqtt',
@@ -51,6 +55,7 @@ const MQTTLocationComponent = () => {
     // Define a callback for handling connection loss
     const onConnectionLost = (responseObject: { errorMessage: string }) => {
       console.log('Connection lost:', responseObject.errorMessage);
+      lastReceivedMessageRef.current = false; // Set the flag to false when connection is lost
     };
 
     // Define a callback for handling incoming messages
@@ -60,6 +65,7 @@ const MQTTLocationComponent = () => {
         const data = JSON.parse(payload);
         const id = message.destinationName.split('/')[1]; // Extract the ID from the topic
         setLocationData((prevData) => ({ ...prevData, [id]: data }));
+        lastReceivedMessageRef.current = true; // Set the flag to true when a message is received
       } catch (error) {
         console.log('Failed to parse message:', error);
       }
@@ -80,13 +86,41 @@ const MQTTLocationComponent = () => {
         console.log('Failed to connect to MQTT broker:', error);
       });
 
-    // Cleanup function to disconnect from the MQTT broker when the component is unmounted
+    // Cleanup function to disconnect from the MQTT broker and clear the timeout when the component is unmounted
     return () => {
       if (client.isConnected()) {
         client.disconnect();
       }
+      if (timeout) {
+        clearTimeout(timeout);
+      }
     };
   }, []);
+
+  // Add a new useEffect for handling the timeout logic
+  useEffect(() => {
+    let timeout: NodeJS.Timeout | null = null;
+
+    // Check if a message was received
+    if (lastReceivedMessageRef.current) {
+      // Reset the flag and set the timeout again
+      lastReceivedMessageRef.current = false;
+      timeout = setTimeout(() => {
+        // Check if no message was received during the timeout
+        if (!lastReceivedMessageRef.current) {
+          console.log('No data received. Flashing components or taking action...');
+          setLocationData({}); // Clear the locationData state
+        }
+      }, 1000);
+    }
+
+    // Cleanup function to clear the timeout when the component is updated or unmounted
+    return () => {
+      if (timeout) {
+        clearTimeout(timeout);
+      }
+    };
+  }, [lastReceivedMessageRef.current]);
 
   // Render the location data as markers on the map
   return (
