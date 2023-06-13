@@ -1,5 +1,5 @@
 {
-  "name": "mqttRenderingPerformance",
+  "name": "mqtt-rendering-performance",
   "version": "0.0.1",
   "private": true,
   "scripts": {
@@ -10,10 +10,13 @@
     "test": "jest"
   },
   "dependencies": {
+    "ngeohash": "^0.6.3",
     "react": "18.2.0",
     "react-native": "0.71.7",
+    "react-native-geolocation-service": "^5.3.1",
     "react-native-maps": "^1.7.1",
-    "react-native-paho-mqtt": "^0.1.1"
+    "react-native-paho-mqtt": "^0.1.1",
+    "uuid": "^9.0.0"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",

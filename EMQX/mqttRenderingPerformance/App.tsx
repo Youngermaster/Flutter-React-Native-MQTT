@@ -1,128 +1,173 @@
-// Import React hooks and React Native components
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text } from 'react-native';
-// Import MQTT client and message from the library
+import { PermissionsAndroid } from 'react-native';
 import { Client, Message } from 'react-native-paho-mqtt';
+import Geolocation from 'react-native-geolocation-service';
+import ngeohash from 'ngeohash';
 import MapView, { Marker } from 'react-native-maps';
 import customMarkerImage from './assets/bus_marker.png';
 
-interface LocationData {
-  [id: string]: {
-    driverLocation: {
-      latitude: number;
-      longitude: number;
-    };
-    route: any[];
-    registerId: string;
-    colorVehicle: boolean;
-    indexDriver: number;
-    iconMetro: boolean;
+interface DriverData {
+  driverId: string;
+  driverLocation: {
+    latitude: number;
+    longitude: number;
   };
+  route: any[];
+  registerId: string;
+  colorVehicle: boolean;
+  indexDriver: number;
+  iconMetro: boolean;
+  timestamp: number;
 }
 
-// Define a custom storage object for the MQTT client
+interface LocationData {
+  [geohash: string]: DriverData[];
+}
+
 const myStorage = {
-  // Function to store an item using the given key
   setItem: (key: string, item: string) => {
     myStorage[key] = item;
   },
-  // Function to retrieve an item using the given key
   getItem: (key: string) => myStorage[key],
-  // Function to remove an item using the given key
   removeItem: (key: string) => {
     delete myStorage[key];
   },
 };
 
-// Define the MQTTLocationComponent
+async function requestLocationPermission() {
+  try {
+    const granted = await PermissionsAndroid.request(
+      PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+      {
+        title: 'Location Permission',
+        message: 'This App needs access to your location.',
+        buttonNeutral: 'Ask Me Later',
+        buttonNegative: 'Cancel',
+        buttonPositive: 'OK',
+      },
+    );
+    if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+      console.log('Location permission granted');
+      return true;
+    } else {
+      console.log('Location permission denied');
+      return false;
+    }
+  } catch (err) {
+    console.warn(err);
+    return false;
+  }
+}
+
 const MQTTLocationComponent = () => {
-  // Create a state variable to store the location data
   const [locationData, setLocationData] = useState<LocationData>({});
-  // Create a ref for the last received message flag
   const lastReceivedMessageRef = useRef<boolean>(false);
 
-  // Use an effect to handle MQTT client initialization and cleanup
   useEffect(() => {
-    let timeout: NodeJS.Timeout | null = null;
+    let client: Client;
+    let currentGeohash: string;
 
-    // Create a new MQTT client with the given configuration
-    const client = new Client({
-      uri: 'ws://10.0.2.2:8083/mqtt',
-      clientId: 'rn-client',
-      storage: myStorage,
-    });
+    const getClient = async () => {
+      const hasPermission = await requestLocationPermission();
 
-    // Define a callback for handling connection loss
-    const onConnectionLost = (responseObject: { errorMessage: string }) => {
-      console.log('Connection lost:', responseObject.errorMessage);
-      lastReceivedMessageRef.current = false; // Set the flag to false when connection is lost
-    };
-
-    // Define a callback for handling incoming messages
-    const onMessageArrived = (message: Message) => {
-      const payload = message.payloadString;
-      try {
-        const data = JSON.parse(payload);
-        const id = message.destinationName.split('/')[1]; // Extract the ID from the topic
-        setLocationData((prevData) => ({ ...prevData, [id]: data }));
-        lastReceivedMessageRef.current = true; // Set the flag to true when a message is received
-      } catch (error) {
-        console.log('Failed to parse message:', error);
+      if (!hasPermission) {
+        console.log('Location permission not granted. Unable to proceed.');
+        return;
       }
+
+      Geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          currentGeohash = ngeohash.encode(latitude, longitude, 5);
+          console.log(currentGeohash);
+
+          client = new Client({
+            uri: 'ws://10.0.2.2:8083/mqtt',
+            clientId: 'rn-client',
+            storage: myStorage,
+          });
+
+          const onConnectionLost = (responseObject: { errorMessage: string }) => {
+            console.log('Connection lost:', responseObject.errorMessage);
+            lastReceivedMessageRef.current = false;
+          };
+
+          const onMessageArrived = (message: Message) => {
+            const payload = message.payloadString;
+            try {
+              const data = JSON.parse(payload);
+              const geohash = message.destinationName.split('/')[1];
+
+              setLocationData((prevData) => {
+                let updatedData = {...prevData};
+                if (!updatedData[geohash]) {
+                  updatedData[geohash] = [];
+                }
+                const driverIndex = updatedData[geohash].findIndex(driverData => driverData.driverId === data.driverId);
+                if (driverIndex >= 0) {
+                  updatedData[geohash][driverIndex] = {...data, timestamp: Date.now() };
+                } else {
+                  updatedData[geohash].push({ ...data, timestamp: Date.now() });
+                }
+                return updatedData;
+              });
+              lastReceivedMessageRef.current = true;
+            } catch (error) {
+              console.log('Failed to parse message:', error);
+            }
+          };
+
+          client.on('connectionLost', onConnectionLost);
+          client.on('messageReceived', onMessageArrived);
+
+          client
+            .connect()
+            .then(() => {
+              console.log('Connected to MQTT broker');
+              client.subscribe(`location/${currentGeohash}/#`);
+            })
+            .catch((error: any) => {
+              console.log('Failed to connect to MQTT broker:', error);
+            });
+        },
+        (error) => {
+          console.log('Error getting location', error);
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
+      );
     };
 
-    // Register the callbacks with the MQTT client
-    client.on('connectionLost', onConnectionLost);
-    client.on('messageReceived', onMessageArrived);
+    getClient();
 
-    // Connect to the MQTT broker and subscribe to the location topic
-    client
-      .connect()
-      .then(() => {
-        console.log('Connected to MQTT broker');
-        client.subscribe('location/#');
-      })
-      .catch((error: any) => {
-        console.log('Failed to connect to MQTT broker:', error);
-      });
-
-    // Cleanup function to disconnect from the MQTT broker and clear the timeout when the component is unmounted
     return () => {
-      if (client.isConnected()) {
+      if (client && client.isConnected()) {
         client.disconnect();
-      }
-      if (timeout) {
-        clearTimeout(timeout);
       }
     };
   }, []);
 
-  // Add a new useEffect for handling the timeout logic
   useEffect(() => {
-    let timeout: NodeJS.Timeout | null = null;
+    const checkStaleDrivers = setInterval(() => {
+      setLocationData((prevData) => {
+        let updatedData = {...prevData};
+        const currentTime = Date.now();
 
-    // Check if a message was received
-    if (lastReceivedMessageRef.current) {
-      // Reset the flag and set the timeout again
-      lastReceivedMessageRef.current = false;
-      timeout = setTimeout(() => {
-        // Check if no message was received during the timeout
-        if (!lastReceivedMessageRef.current) {
-          console.log('No data received. Flashing components or taking action...');
-          setLocationData({}); // Clear the locationData state
+        for (let geohash in updatedData) {
+          updatedData[geohash] = updatedData[geohash].filter(driverData => currentTime - driverData.timestamp < 5000);
+          if (updatedData[geohash].length === 0) {
+            delete updatedData[geohash];
+          }
         }
-      }, 1000);
-    }
 
-    // Cleanup function to clear the timeout when the component is updated or unmounted
+        return updatedData;
+      });
+    }, 5000);
+
     return () => {
-      if (timeout) {
-        clearTimeout(timeout);
-      }
+      clearInterval(checkStaleDrivers);
     };
-  }, [lastReceivedMessageRef.current]);
+  }, []);
 
-  // Render the location data as markers on the map
   return (
     <MapView
       style={{ flex: 1 }}
@@ -133,11 +178,11 @@ const MQTTLocationComponent = () => {
         longitudeDelta: 360,
       }}
     >
-      {Object.entries(locationData).map(([id, data]) => {
+      {Object.values(locationData).flat().map((data) => {
         const { latitude, longitude } = data.driverLocation;
         return (
           <Marker
-            key={id}
+            key={data.driverId}
             coordinate={{
               latitude,
               longitude,
@@ -150,5 +195,4 @@ const MQTTLocationComponent = () => {
   );
 };
 
-// Export the MQTTLocationComponent
 export default MQTTLocationComponent;
