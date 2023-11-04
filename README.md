@@ -1,6 +1,6 @@
 # Flutter React Native MQTT
 
-A project to store some client side apps to intereact with a MQTT Broker.
+A project to store some client side apps to intereact with MQTT Brokers and Kafka.
 
 ## RabbitMQ
 
