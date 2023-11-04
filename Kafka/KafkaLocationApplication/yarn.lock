@@ -1685,7 +1685,7 @@
 
 "@react-native-community/geolocation@^3.1.0":
   version "3.1.0"
-  resolved "https://registry.yarnpkg.com/@react-native-community/geolocation/-/geolocation-3.1.0.tgz#573881e9536d55cc2af74762183fa7ba575b2553"
+  resolved "https://registry.npmjs.org/@react-native-community/geolocation/-/geolocation-3.1.0.tgz"
   integrity sha512-Aj76wMeCLz9kczpe7W2IXxSRNj+hRR7sqyfXq9ZaJIWNH23jeJfzMpovclg+e1uM8Vr8jCYEcZyD4rKub6Vc/Q==
 
 "@react-native/assets-registry@^0.72.0":
@@ -5545,11 +5545,6 @@ react-native-fused-location@^1.1.2:
   version "1.1.2"
   resolved "https://registry.npmjs.org/react-native-fused-location/-/react-native-fused-location-1.1.2.tgz"
   integrity sha512-kq+K+DwT7tAm6T2Rqx1+9aKPYXg5Cw+xHCceAfbtE37UR/dDKL5YegnvqInQ9UrI68w7MfkNsULZRVQpOZ7Q3w==
-
-react-native-geolocation-service@^5.3.1:
-  version "5.3.1"
-  resolved "https://registry.npmjs.org/react-native-geolocation-service/-/react-native-geolocation-service-5.3.1.tgz"
-  integrity sha512-LTXPtPNmrdhx+yeWG47sAaCgQc3nG1z+HLLHlhK/5YfOgfLcAb9HAkhREPjQKPZOUx8pKZMIpdGFUGfJYtimXQ==
 
 react-native-maps@^1.8.0:
   version "1.8.0"
