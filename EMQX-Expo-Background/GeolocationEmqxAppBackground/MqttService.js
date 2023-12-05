@@ -1,4 +1,15 @@
-import { Client } from 'react-native-paho-mqtt';
+import { Client, Message } from 'react-native-paho-mqtt';
+
+// Set up an in-memory alternative to global localStorage
+const myStorage = {
+  setItem: (key, item) => {
+    myStorage[key] = item;
+  },
+  getItem: (key) => myStorage[key],
+  removeItem: (key) => {
+    delete myStorage[key];
+  },
+};
 
 class MqttService {
   constructor() {
@@ -8,7 +19,7 @@ class MqttService {
     const clientId = `mqtt_${Math.random().toString(16).slice(3)}`;
 
     // Create a client instance
-    this.client = new Client({ uri: `ws://${mqttHost}:${mqttPort}/mqtt`, clientId: clientId });
+    this.client = new Client({ uri: `ws://${mqttHost}:${mqttPort}/mqtt`, clientId: clientId, storage: myStorage });
 
     // Set up event handlers
     this.client.on('connectionLost', (responseObject) => {
@@ -26,7 +37,7 @@ class MqttService {
   }
 
   sendMessage(topic, message) {
-    const mqttMessage = new Paho.Message(message);
+    const mqttMessage = new Message(message);
     mqttMessage.destinationName = topic;
     this.client.send(mqttMessage);
   }
