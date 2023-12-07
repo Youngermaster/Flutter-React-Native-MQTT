@@ -52,6 +52,7 @@ const LocationDisplay: React.FC = () => {
   return (
     <View style={styles.container}>
       <Text style={styles.text}>{location}</Text>
+      <Text>SS</Text>
     </View>
   );
 };
