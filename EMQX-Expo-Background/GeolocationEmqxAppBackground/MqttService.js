@@ -14,8 +14,9 @@ const myStorage = {
 class MqttService {
   constructor() {
     // Define your MQTT broker settings
-    const mqttHost = '10.0.2.2'; // for Android emulator bridge to localhost
-    const mqttPort = 1883; // Default MQTT port
+    // const mqttHost = '10.0.2.2'; // for Android emulator bridge to localhost
+    const mqttHost = '192.168.20.33'; // for Android emulator bridge to localhost
+    const mqttPort = 8083; // Default MQTT port
     const clientId = `mqtt_${Math.random().toString(16).slice(3)}`;
 
     // Create a client instance
