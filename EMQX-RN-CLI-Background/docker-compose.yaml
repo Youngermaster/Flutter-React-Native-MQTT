@@ -1,0 +1,14 @@
+version: '3.8' # Specifies the version of the Docker Compose file format
+
+services:
+  emqx:
+    # Defines a service named 'emqx'
+    image: emqx/emqx:latest # Specifies the Docker image to use (latest version of EMQX)
+    container_name: emqx # Names the container as 'emqx'
+    ports:
+      - "1883:1883" # Maps MQTT TCP port 1883 in the container to the host
+      - "8083:8083" # Maps MQTT WebSocket port 8083 in the container to the host
+      - "8084:8084" # Maps MQTT WSS port 8084 in the container to the host
+      - "8883:8883" # Maps MQTT SSL port 8883 in the container to the host
+      - "18083:18083" # Maps EMQX Dashboard port 18083 in the container to the host
+    restart: always # Ensures the container always restarts unless manually stopped
