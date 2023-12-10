@@ -1,7 +1,15 @@
 import React, {useEffect, useState} from 'react';
-import {SafeAreaView, StatusBar, Text, useColorScheme} from 'react-native';
+import {
+  SafeAreaView,
+  StatusBar,
+  Text,
+  useColorScheme,
+  PermissionsAndroid,
+  Platform,
+} from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
 import {Client, Message} from 'react-native-paho-mqtt';
+import BackgroundFetch from 'react-native-background-fetch';
 
 const App: React.FC = () => {
   const isDarkMode = useColorScheme() === 'dark';
@@ -25,18 +33,9 @@ const App: React.FC = () => {
     storage: myStorage,
   });
 
-  // Connect the client and set event handlers
-  useEffect(() => {
-    client
-      .connect()
-      .then(() => {
-        console.log('Connected to MQTT Broker!');
-      })
-      .catch(error => {
-        console.log('Connection failed: ', error);
-      });
-
-    const watchId = Geolocation.watchPosition(
+  const fetchLocation = async () => {
+    // Get current location and send it to MQTT
+    Geolocation.getCurrentPosition(
       position => {
         const {latitude, longitude} = position.coords;
         setLocation({latitude, longitude});
@@ -48,17 +47,80 @@ const App: React.FC = () => {
         client.send(locationMessage);
       },
       error => console.log(error),
-      {
-        enableHighAccuracy: true,
-        timeout: 20000,
-        maximumAge: 1000,
-        distanceFilter: 1,
-      },
+      {enableHighAccuracy: true, timeout: 20000, maximumAge: 1000},
+    );
+  };
+
+  const requestLocationPermission = async () => {
+    try {
+      const granted = await PermissionsAndroid.requestMultiple([
+        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+        PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
+      ]);
+
+      if (
+        granted['android.permission.ACCESS_FINE_LOCATION'] ===
+          PermissionsAndroid.RESULTS.GRANTED &&
+        granted['android.permission.ACCESS_COARSE_LOCATION'] ===
+          PermissionsAndroid.RESULTS.GRANTED
+      ) {
+        console.log('Location permissions granted');
+        if (Platform.Version >= 29) {
+          const backgroundGranted = await PermissionsAndroid.request(
+            PermissionsAndroid.PERMISSIONS.ACCESS_BACKGROUND_LOCATION,
+          );
+
+          if (backgroundGranted === PermissionsAndroid.RESULTS.GRANTED) {
+            console.log('Background location permission granted');
+          } else {
+            console.log('Background location permission denied');
+          }
+        }
+      } else {
+        console.log('Location permissions denied');
+      }
+    } catch (err) {
+      console.warn(err);
+    }
+  };
+
+  // Configure BackgroundFetch
+  const initBackgroundFetch = async () => {
+    const onEvent = async taskId => {
+      console.log('[BackgroundFetch] task: ', taskId);
+      await fetchLocation();
+      BackgroundFetch.finish(taskId);
+    };
+
+    const onTimeout = async taskId => {
+      console.warn('[BackgroundFetch] TIMEOUT task: ', taskId);
+      BackgroundFetch.finish(taskId);
+    };
+
+    let status = await BackgroundFetch.configure(
+      {minimumFetchInterval: 15},
+      onEvent,
+      onTimeout,
     );
 
+    console.log('[BackgroundFetch] configure status: ', status);
+  };
+
+  useEffect(() => {
+    requestLocationPermission();
+    client
+      .connect()
+      .then(() => {
+        console.log('Connected to MQTT Broker!');
+        initBackgroundFetch();
+      })
+      .catch(error => {
+        console.log('Connection failed: ', error);
+      });
+
     return () => {
-      Geolocation.clearWatch(watchId);
       client.disconnect();
+      BackgroundFetch.stop();
     };
   }, []);
 
